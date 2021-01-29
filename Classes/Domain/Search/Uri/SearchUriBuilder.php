@@ -342,7 +342,7 @@ class SearchUriBuilder
      * @param array $arguments
      * @return string
      */
-    protected function buildLinkWithInMemoryCache($pageUid, array $arguments)
+    protected function buildLinkWithInMemoryCache(int $pageUid, array $arguments): string
     {
         $values = [];
         $structure = $arguments;
@@ -376,14 +376,17 @@ class SearchUriBuilder
         $routingConfigurations = $this->routingService
             ->fetchEnhancerByPageUid($pageUid);
         $enhancedRouting = count($routingConfigurations) > 0;
-        if ($enhancedRouting && is_array($routingConfigurations[0]['_arguments'])) {
-            $this->routingService = $this->routingService->withPathArguments($routingConfigurations[0]['_arguments']);
+        $this->routingService->reset();
+        if ($enhancedRouting && is_array($routingConfigurations[0])) {
+            $this->routingService->fromRoutingConfiguration($routingConfigurations[0]);
         }
+
         /* @var Uri $uri */
         $uri = GeneralUtility::makeInstance(
             Uri::class,
             $uriCacheTemplate
         );
+
         $urlEvent = $enhancedRouting ?
             new BeforeReplaceVariableInEnhancedCachedUrlEvent($uri) :
             new BeforeReplaceVariableInCachedUrlEvent($uri);
@@ -401,9 +404,15 @@ class SearchUriBuilder
             new BeforeProcessCachedVariablesEvent($keys, $values);
         $this->eventDispatcher->dispatch($variableEvent);
 
-        $keys = $variableEvent->getVariableKeys();
         $values = $variableEvent->getVariableValues();
-        $values = $this->routingService->reviseFilterVariables($values);
+        // Take care that everything is urlencoded!
+        $keys = array_map(function($value) {
+            // @TODO: With only PHP 8 support, replace this with str_contains()
+            if (strpos($value, '###') === false) {
+                return $value;
+            }
+            return urlencode($value);
+        }, array_keys($values));
 
         $uri = str_replace($keys, $values, $uriCacheTemplate);
         $uri = GeneralUtility::makeInstance(
