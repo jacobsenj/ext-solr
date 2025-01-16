@@ -132,6 +132,9 @@ class SiteRepository
         $siteGenerator->rewind();
 
         $sites = [];
+        if (!$siteGenerator->valid()) {
+            return $sites;
+        }        
         foreach ($siteGenerator as $rootPageId => $site) {
             if (isset($sites[$rootPageId])) {
                 //get each site only once
